@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Object Detector</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <style>
+        .drop-zone {
+            border: 2px dashed #cbd5e1;
+            transition: all 0.3s ease;
+        }
+        .drop-zone.dragover {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+        }
+        .select2-container {
+            width: 100% !important;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen py-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-3xl mx-auto">
+            <div class="text-center mb-12">
+                <h1 class="text-4xl font-bold text-gray-900 mb-4">Object Detector</h1>
+                <p class="text-lg text-gray-600">Select objects to detect and upload an image</p>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <!-- Class Selection -->
+                <div class="mb-6">
+                    <label for="class-select" class="block text-sm font-medium text-gray-700 mb-2">
+                        Select Objects to Detect
+                    </label>
+                    <select id="class-select" multiple class="form-multiselect block w-full rounded-md">
+                        <option value="person">person</option>
+                        <option value="bicycle">bicycle</option>
+                        <option value="car">car</option>
+                        <option value="motorcycle">motorcycle</option>
+                        <option value="airplane">airplane</option>
+                        <option value="bus">bus</option>
+                        <option value="train">train</option>
+                        <option value="truck">truck</option>
+                        <option value="boat">boat</option>
+                        <option value="traffic light">traffic light</option>
+                        <option value="fire hydrant">fire hydrant</option>
+                        <option value="stop sign">stop sign</option>
+                        <option value="parking meter">parking meter</option>
+                        <option value="bench">bench</option>
+                        <option value="bird">bird</option>
+                        <option value="cat">cat</option>
+                        <option value="dog">dog</option>
+                        <option value="horse">horse</option>
+                        <option value="sheep">sheep</option>
+                        <option value="cow">cow</option>
+                        <option value="elephant">elephant</option>
+                        <option value="bear">bear</option>
+                        <option value="zebra">zebra</option>
+                        <option value="giraffe">giraffe</option>
+                        <!-- Add more COCO classes as needed -->
+                    </select>
+                </div>
+
+                <div id="upload-zone" class="drop-zone rounded-lg p-8 text-center cursor-pointer mt-6">
+                    <div class="space-y-4">
+                        <div class="flex justify-center">
+                            <svg class="h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                            </svg>
+                        </div>
+                        <div class="text-gray-600">
+                            <span class="font-medium">Click to upload</span> or drag and drop
+                        </div>
+                        <p class="text-xs text-gray-500">PNG, JPG, JPEG up to 16MB</p>
+                    </div>
+                </div>
+
+                <div id="loading" class="hidden mt-6 text-center">
+                    <div class="inline-flex items-center px-4 py-2 font-semibold leading-6 text-blue-600">
+                        <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" 
+                                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                            </path>
+                        </svg>
+                        Processing...
+                    </div>
+                </div>
+
+                <div id="result" class="hidden mt-6 space-y-4">
+                    <div class="text-center">
+                        <h2 class="text-2xl font-bold text-gray-900">Results</h2>
+                        <div id="detection-results" class="mt-4 space-y-2"></div>
+                    </div>
+                    <div class="rounded-lg overflow-hidden">
+                        <img id="result-image" class="w-full" src="" alt="Processed image">
+                    </div>
+                    <button onclick="resetUpload()" 
+                            class="mt-4 w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        Upload Another Image
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <input type="file" id="file-input" class="hidden" accept=".png,.jpg,.jpeg">
+
+    <script>
+        // Initialize Select2
+        $(document).ready(function() {
+            $('#class-select').select2({
+                placeholder: 'Select objects to detect',
+                width: 'resolve'
+            });
+        });
+
+        const uploadZone = document.getElementById('upload-zone');
+        const fileInput = document.getElementById('file-input');
+        const loading = document.getElementById('loading');
+        const result = document.getElementById('result');
+        const resultImage = document.getElementById('result-image');
+        const detectionResults = document.getElementById('detection-results');
+        const classSelect = document.getElementById('class-select');
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadZone.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            uploadZone.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            uploadZone.addEventListener(eventName, unhighlight, false);
+        });
+
+        uploadZone.addEventListener('drop', handleDrop, false);
+        uploadZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', handleFiles);
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        function highlight(e) {
+            uploadZone.classList.add('dragover');
+        }
+
+        function unhighlight(e) {
+            uploadZone.classList.remove('dragover');
+        }
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles({ target: { files } });
+        }
+
+        function handleFiles(e) {
+            const file = e.target.files[0];
+            const selectedClasses = Array.from(classSelect.selectedOptions).map(option => option.value);
+            
+            if (!selectedClasses.length) {
+                alert('Please select at least one object to detect');
+                return;
+            }
+            
+            if (file) {
+                uploadFile(file, selectedClasses);
+            }
+        }
+
+        function uploadFile(file, selectedClasses) {
+            const formData = new FormData();
+            formData.append('file', file);
+            selectedClasses.forEach(className => {
+                formData.append('classes[]', className);
+            });
+
+            uploadZone.classList.add('hidden');
+            loading.classList.remove('hidden');
+            result.classList.add('hidden');
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                loading.classList.add('hidden');
+                result.classList.remove('hidden');
+                resultImage.src = data.image;
+                
+                // Display detection results
+                detectionResults.innerHTML = '';
+                Object.entries(data.detections).forEach(([className, count]) => {
+                    const resultElement = document.createElement('p');
+                    resultElement.className = 'text-lg text-gray-600';
+                    resultElement.textContent = `${className}: ${count} detected`;
+                    detectionResults.appendChild(resultElement);
+                });
+            })
+            .catch(error => {
+                alert('Error: ' + error.message);
+                resetUpload();
+            });
+        }
+
+        function resetUpload() {
+            uploadZone.classList.remove('hidden');
+            loading.classList.add('hidden');
+            result.classList.add('hidden');
+            fileInput.value = '';
+            detectionResults.innerHTML = '';
+        }
+    </script>
+</body>
+</html>
